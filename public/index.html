@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tilapia Hatchery Monitoring System</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Header -->
+    <header class="dashboard-header">
+      <div class="header-left">
+        <!-- Branding -->
+        <img class="header-logo" src="/public/css/img/logo.png" alt="Tilapia Hatchery Logo">
+        <div class="header-titles">
+          <h1 class="system-title">Tilapia Hatchery Monitoring System</h1>
+          <p class="system-subtitle">Real-time Water Quality &amp; Hatching Detection</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <!-- Theme Toggle -->
+        <button class="theme-toggle-btn" id="theme-toggle" type="button" aria-label="Toggle theme" aria-pressed="false">
+          <span class="theme-toggle-label" id="theme-toggle-label">Theme</span>
+        </button>
+        <div class="datetime-display">
+          <span id="current-date"></span>
+          <span id="current-time"></span>
+        </div>
+        <div class="notification-container">
+          <button class="notification-btn" id="notification-btn">
+            <img src="css/icons/bell.png" alt="Notifications" class="bell-icon">
+            <span class="notification-badge" id="notification-badge"></span>
+          </button>
+          <div class="notification-dropdown" id="notification-dropdown">
+            <div class="notification-header">
+              <h3>Notifications</h3>
+              <button class="clear-all-btn" id="clear-all-btn">Clear All</button>
+            </div>
+            <div class="notification-list" id="notification-list">
+              <div class="no-notifications">No notifications</div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-container">
+          <button class="settings-btn" id="settings-btn" aria-haspopup="true" aria-expanded="false">
+            <img src="css/icons/settings.png" alt="Settings" class="settings-icon">
+          </button>
+          <div class="settings-dropdown" id="settings-dropdown" role="menu">
+            <a class="settings-item" href="/reports" role="menuitem">Reports</a>
+            <button class="settings-item" id="settings-logout" type="button" role="menuitem">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Connection Status -->
+    <div class="connection-status" id="connection-status">
+      <span>Connected to Firebase Realtime Database</span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Top Section: Sensors on Left, Camera on Right -->
+      <div class="top-section">
+        <!-- Water Quality Sensors -->
+        <section class="panel sensors-panel">
+          <div class="panel-header">
+            <h2>Water Quality Sensors</h2>
+          </div>
+          <div class="sensors-section">
+          <div class="sensor-card">
+            <div class="card-header">
+              <h3>Temperature</h3>
+            </div>
+            <div class="sensor-value" id="temperature-value">--</div>
+            <div class="range-container">
+              <div class="range-bar">
+                <div class="range-fill temperature-fill" id="temperature-fill"></div>
+                <div class="range-labels">
+                  <span>20°C</span>
+                  <span class="optimal-range-label">Optimal Range</span>
+                  <span>32°C</span>
+                </div>
+              </div>
+            </div>
+            <div class="status-badge" id="temperature-status">
+              <span>--</span>
+            </div>
+            <div class="timestamp" id="temperature-timestamp">Updated: --</div>
+          </div>
+
+          <div class="sensor-card">
+            <div class="card-header">
+              <h3>Turbidity</h3>
+            </div>
+            <div class="sensor-value" id="turbidity-value">--</div>
+            <div class="range-container">
+              <div class="range-bar">
+                <div class="range-fill turbidity-fill" id="turbidity-fill"></div>
+                <div class="range-labels">
+                  <span>0 NTU</span>
+                  <span class="optimal-range-label">Optimal Range</span>
+                  <span>100 NTU</span>
+                </div>
+              </div>
+            </div>
+            <div class="status-badge" id="turbidity-status">
+              <span>--</span>
+            </div>
+            <div class="timestamp" id="turbidity-timestamp">Updated: --</div>
+          </div>
+
+          <div class="sensor-card">
+            <div class="card-header">
+              <h3>TDS</h3>
+            </div>
+            <div class="sensor-value" id="tds-value">--</div>
+            <div class="range-container">
+              <div class="range-bar">
+                <div class="range-fill tds-fill" id="tds-fill"></div>
+                <div class="range-labels">
+                  <span>0 ppm</span>
+                  <span class="optimal-range-label">Optimal Range</span>
+                  <span>1000 ppm</span>
+                </div>
+              </div>
+            </div>
+            <div class="status-badge" id="tds-status">
+              <span>--</span>
+            </div>
+            <div class="timestamp" id="tds-timestamp">Updated: --</div>
+          </div>
+          </div>
+        </section>
+
+        <!-- Camera & Detection Controls -->
+        <section class="panel camera-panel">
+          <div class="panel-header">
+            <h2>Camera &amp; Detection</h2>
+          </div>
+          <div class="camera-section">
+          <div class="camera-card primary-camera">
+            <div class="card-header">
+              <h3>Primary Hatchery Camera</h3>
+              <div class="camera-controls">
+                <div class="live-indicator" id="live-indicator" style="display:none;">
+                  <span class="live-dot"></span>
+                  <span>Live</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Camera Selector -->
+            <div class="detection-controls">
+              <select id="camera-select" class="camera-select" disabled>
+                <option value="">-- Select Camera --</option>
+              </select>
+              <span class="selected-camera-name" id="selected-camera-name"></span>
+            </div>
+
+            <!-- Video + Canvas Overlay -->
+            <div class="video-container">
+              <video id="detection-video" autoplay playsinline muted></video>
+              <canvas id="detection-canvas"></canvas>
+              <div class="video-overlay">
+                <span class="yolo-badge" id="yolo-badge" style="display:none;">YOLO Active</span>
+                <span class="video-timestamp" id="primary-timestamp"></span>
+              </div>
+              <div class="detection-stats-overlay" id="detection-stats-overlay" style="display:none;">
+                <span id="overlay-egg-count">Eggs: 0</span>
+                <span id="overlay-avg-conf">Conf: 0.00</span>
+                <span id="overlay-fps">FPS: 0</span>
+              </div>
+            </div>
+
+            <!-- Detection Buttons -->
+            <div class="detection-btn-group">
+              <button class="detect-btn detect-start" id="btn-start-detection" onclick="window.detectorStartDetection()">Start Detection</button>
+              <button class="detect-btn detect-stop" id="btn-stop-detection" onclick="window.detectorStopDetection()" disabled>Stop Detection</button>
+              <button class="detect-btn detect-continue" id="btn-continue-detection" onclick="window.detectorContinueDetection()" disabled>Continue Detection</button>
+            </div>
+
+            <!-- Tank Selection Buttons -->
+            <div class="tank-controls">
+              <button class="tank-btn" id="tankA-btn" onclick="selectTank('TankA')">Tank A</button>
+              <button class="tank-btn" id="tankB-btn" onclick="selectTank('TankB')">Tank B</button>
+            </div>
+            <!-- Information Panel -->
+            <div class="info-panel">
+              <div class="info-item">
+                <span class="info-label">Average egg count (last 5 minutes):</span>
+                <span class="info-value" id="avg-egg-count">0</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Timestamp of last 5-minute average:</span>
+                <span class="info-value" id="avg-timestamp">--:--:--</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Current frame egg count:</span>
+                <span class="info-value" id="current-egg-count">0</span>
+              </div>
+            </div>
+          </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- History Charts Row - Aligned below sensors and camera -->
+      <section class="panel charts-panel">
+        <div class="panel-header">
+          <h2>Historical Charts</h2>
+        </div>
+        <div class="charts-section">
+          <div class="charts-grid">
+          <div class="history-card">
+            <div class="card-header">
+              <h3>Temperature History</h3>
+            </div>
+            <div class="time-range-buttons">
+              <button class="time-btn" data-range="1h">1h</button>
+              <button class="time-btn" data-range="6h">6h</button>
+              <button class="time-btn active" data-range="24h">24h</button>
+              <button class="time-btn" data-range="7d">7d</button>
+            </div>
+            <div class="chart-container">
+              <canvas id="temperature-chart"></canvas>
+              <div class="collecting-data" id="temperature-collecting">Collecting data...</div>
+            </div>
+          </div>
+
+          <div class="history-card">
+            <div class="card-header">
+              <h3>Turbidity History</h3>
+            </div>
+            <div class="time-range-buttons">
+              <button class="time-btn" data-range="1h">1h</button>
+              <button class="time-btn" data-range="6h">6h</button>
+              <button class="time-btn active" data-range="24h">24h</button>
+              <button class="time-btn" data-range="7d">7d</button>
+            </div>
+            <div class="chart-container">
+              <canvas id="turbidity-chart"></canvas>
+              <div class="collecting-data" id="turbidity-collecting">Collecting data...</div>
+            </div>
+          </div>
+
+          <div class="history-card">
+            <div class="card-header">
+              <h3>TDS History</h3>
+            </div>
+            <div class="time-range-buttons">
+              <button class="time-btn" data-range="1h">1h</button>
+              <button class="time-btn" data-range="6h">6h</button>
+              <button class="time-btn active" data-range="24h">24h</button>
+              <button class="time-btn" data-range="7d">7d</button>
+            </div>
+            <div class="chart-container">
+              <canvas id="tds-chart"></canvas>
+              <div class="collecting-data" id="tds-collecting">Collecting data...</div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="js/firebase.js"></script>
+  <!-- Authentication Guard -->
+  <script src="js/auth-guard.js"></script>
+
+  <!-- Loading Overlay -->
+  <div id="auth-loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Authenticating...</p>
+  </div>
+
+  <script type="module" src="js/notifications.js"></script>
+  <script type="module" src="js/sensors.js"></script>
+  <script type="module" src="js/charts.js"></script>
+  <script type="module" src="js/detector.js"></script>
+  <script type="module" src="js/tank-manager.js"></script>
+  <script src="js/theme.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+  <script src="js/settings-dropdown.js"></script>
+</body>
+</html>
+

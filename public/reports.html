@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Hatchery Reports</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/reports-print.css" media="print">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <div class="dashboard-container reports-page">
+    <header class="dashboard-header">
+      <div class="header-left">
+        <img src="/public/css/img/logo.png" alt="Smart Hatchery Logo" class="header-logo">
+        <div class="header-titles">
+          <h1 class="system-title">Smart Hatchery Reports</h1>
+          <p class="system-subtitle">Historical performance and alerts</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <!-- Theme Toggle -->
+        <button class="theme-toggle-btn" id="theme-toggle" type="button" aria-label="Toggle theme" aria-pressed="false">
+          <span class="theme-toggle-label" id="theme-toggle-label">Theme</span>
+        </button>
+        <div class="datetime-display">
+          <span id="current-date"></span>
+          <span id="current-time"></span>
+        </div>
+        <div class="settings-container">
+          <button class="settings-btn" id="settings-btn" aria-haspopup="true" aria-expanded="false">
+            <img src="css/icons/settings.png" alt="Settings" class="settings-icon">
+          </button>
+          <div class="settings-dropdown" id="settings-dropdown" role="menu">
+            <a class="settings-item" href="/dashboard" role="menuitem">Dashboard</a>
+            <button class="settings-item" id="settings-logout" type="button" role="menuitem">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <section class="reports-section">
+        <div class="reports-header">
+          <div class="reports-title">Summary</div>
+          <div class="report-actions">
+            <button type="button" id="view-report-btn" class="report-btn view-btn">View Report</button>
+            <button type="button" id="print-report-btn" class="report-btn print-btn">Print Report</button>
+          </div>
+          <div class="date-range">
+            <label>
+              <span class="summary-label">Start</span>
+              <input type="date" id="range-start">
+            </label>
+            <label>
+              <span class="summary-label">End</span>
+              <input type="date" id="range-end" placeholder="dd/mm/yyyy" inputmode="numeric">
+            </label>
+            <button type="button" id="apply-range">Apply</button>
+          </div>
+        </div>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-label">Total egg detections</div>
+            <div class="summary-value" id="summary-total">--</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Average eggs per detection</div>
+            <div class="summary-value" id="summary-average">--</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Active tanks</div>
+            <div class="summary-value" id="summary-tanks">--</div>
+          </div>
+        </div>
+        <div class="report-note" id="summary-note"></div>
+      </section>
+
+      <section class="reports-section">
+        <div class="reports-title">Egg Detection Records</div>
+        <div class="report-grid">
+          <div>
+            <div class="table-wrap">
+              <table class="data-table" id="egg-table">
+                <thead>
+                  <tr>
+                    <th>Interval Start</th>
+                    <th>Interval End</th>
+                    <th>Tank</th>
+                    <th>Average Egg Count</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div id="egg-pagination" class="pagination-controls"></div>
+          </div>
+          <div class="chart-container report-chart">
+            <canvas id="egg-chart"></canvas>
+          </div>
+        </div>
+        <div class="report-note" id="egg-note"></div>
+      </section>
+
+      <section class="reports-section">
+        <div class="reports-title">Water Quality Records</div>
+        <div class="report-grid">
+          <div>
+            <div class="table-wrap">
+              <table class="data-table" id="water-table">
+                <thead>
+                  <tr>
+                    <th>Recorded At</th>
+                    <th>Temperature</th>
+                    <th>TDS</th>
+                    <th>Turbidity</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div id="water-pagination" class="pagination-controls"></div>
+          </div>
+          <div class="chart-container report-chart">
+            <canvas id="water-chart"></canvas>
+          </div>
+        </div>
+        <div class="report-note" id="water-note"></div>
+      </section>
+
+      <section class="reports-section">
+        <div class="reports-title">System Events / Alerts</div>
+        <div class="table-wrap">
+          <table class="data-table" id="events-table">
+            <thead>
+              <tr>
+                <th>Created At</th>
+                <th>Type</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="events-pagination" class="pagination-controls"></div>
+        <div class="report-note" id="events-note"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Authentication Guard -->
+  <script src="js/auth-guard.js"></script>
+
+  <!-- Loading Overlay -->
+  <div id="auth-loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Authenticating...</p>
+  </div>
+
+  <script type="module" src="js/reports.js"></script>
+  <script src="js/theme.js" defer></script>
+  <script src="js/settings-dropdown.js"></script>
+</body>
+</html>

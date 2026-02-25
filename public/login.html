@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Login</title>
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <main class="page">
+        <div class="bg-illustrations" aria-hidden="true"></div>
+
+        <section class="portal" aria-label="Portal Login">
+            <header class="portal-header">
+                <div class="brand-mark" aria-hidden="true">
+                    <img class="brand-logo" src="css/img/logo.png" alt="City Agriculture Office Logo">
+                </div>
+                <h1 class="portal-title">City Agriculture Office</h1>
+                <p class="portal-subtitle">City of Panabo</p>
+            </header>
+
+            <section class="card" aria-label="Login form">
+                <h2 class="card-title">Portal Login</h2>
+
+                <form id="login-form" class="form" novalidate>
+                    <div class="field">
+                        <label class="field-label" for="username">Username</label>
+                        <div class="field-control">
+                            <span class="field-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="18" height="18" focusable="false" aria-hidden="true">
+                                    <path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/>
+                                </svg>
+                            </span>
+                            <input
+                                id="username"
+                                name="username"
+                                type="text"
+                                inputmode="email"
+                                autocomplete="username"
+                                placeholder="Enter your username"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label" for="password">Password</label>
+                        <div class="field-control">
+                            <span class="field-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="18" height="18" focusable="false" aria-hidden="true">
+                                    <path fill="currentColor" d="M17 8h-1V6a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 0 1 4 0v2h-4Zm7 13H7v-9h10Z"/>
+                                </svg>
+                            </span>
+                            <input
+                                id="password"
+                                name="password"
+                                type="password"
+                                autocomplete="current-password"
+                                placeholder="Enter your password"
+                                required
+                            />
+                            <button class="field-action" type="button" id="toggle-password" aria-label="Show password">
+                                <svg id="eye-icon" viewBox="0 0 24 24" width="18" height="18" focusable="false" aria-hidden="true">
+                                    <path fill="currentColor" d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7Zm0 12a5 5 0 1 1 5-5 5 5 0 0 1-5 5Zm0-8a3 3 0 1 0 3 3 3 3 0 0 0-3-3Z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="options">
+                        <label class="remember">
+                            <input id="remember" type="checkbox" name="remember">
+                            <span>Remember me</span>
+                        </label>
+                        <a class="forgot" href="#" id="forgot-password">Forgot password?</a>
+                    </div>
+
+                    <div id="error-message" class="error" role="alert" style="display: none;">
+                        <span id="error-text"></span>
+                    </div>
+
+                    <button type="submit" id="login-btn" class="primary">
+                        <span id="btn-text">Sign In</span>
+                        <span id="btn-loading" class="btn-spinner" aria-hidden="true" style="display: none;"></span>
+                    </button>
+
+                    <footer class="card-footer">
+                        <small>© 2026 City Agriculture Office, City of Panabo</small>
+                    </footer>
+                </form>
+            </section>
+
+            <footer class="page-footer">
+                <span>Need assistance?</span>
+                <a href="#" class="support" id="contact-support">Contact Support</a>
+            </footer>
+        </section>
+    </main>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    
+    <!-- Login Script -->
+    <script src="js/login.js"></script>
+</body>
+</html>

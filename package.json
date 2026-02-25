@@ -1,0 +1,22 @@
+{
+  "name": "tilapia-hatchery-monitoring",
+  "version": "1.0.0",
+  "description": "Tilapia Hatchery Monitoring System Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.2.4",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.7.0",
+    "mysql2": "^3.16.3",
+    "nodemailer": "^6.9.16"
+  },
+  "license": "ISC"
+}
+

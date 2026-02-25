@@ -1,0 +1,7 @@
+node_modules/
+.env
+serviceAccountKey.json
+vision/venv/
+vision/yolov5/
+__pycache__/
+*.pyc
