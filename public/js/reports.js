@@ -104,19 +104,21 @@ function setDefaultDateRange() {
   if (!endInput || !startInput) return;
 
   const end = new Date();
-  const start = new Date();
 
   endInput.value = formatDateInput(end);
-  startInput.value = start.toISOString().slice(0, 10);
+  startInput.value = formatDateInput(end);
 }
 
 function scheduleStartDateRefresh() {
   const startInput = document.getElementById('range-start');
-  if (!startInput) return;
+  const endInput = document.getElementById('range-end');
+  if (!startInput || !endInput) return;
 
   const refreshStartDate = () => {
     const today = new Date();
-    startInput.value = today.toISOString().slice(0, 10);
+    const todayValue = formatDateInput(today);
+    startInput.value = todayValue;
+    endInput.value = todayValue;
   };
 
   refreshStartDate();
@@ -133,35 +135,17 @@ function scheduleStartDateRefresh() {
 }
 
 function formatDateInput(date) {
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-function parseDdMmYyyy(value) {
-  if (!value) return null;
-  const parts = value.split('/').map(part => part.trim());
-  if (parts.length !== 3) return null;
-  const [dayStr, monthStr, yearStr] = parts;
-  const day = Number(dayStr);
-  const month = Number(monthStr);
-  const year = Number(yearStr);
-  if (!day || !month || !year) return null;
-  const parsed = new Date(year, month - 1, day);
-  if (Number.isNaN(parsed.getTime())) return null;
-  if (parsed.getDate() !== day || parsed.getMonth() !== month - 1 || parsed.getFullYear() !== year) {
-    return null;
-  }
-  return parsed;
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function getSelectedRange() {
   const endValue = document.getElementById('range-end')?.value;
   const startValue = document.getElementById('range-start')?.value;
 
-  const parsedEnd = parseDdMmYyyy(endValue);
-  const end = parsedEnd ? new Date(parsedEnd.setHours(23, 59, 59, 999)) : new Date();
+  const end = endValue ? new Date(`${endValue}T23:59:59.999`) : new Date();
   const start = startValue ? new Date(`${startValue}T00:00:00`) : new Date();
   start.setHours(0, 0, 0, 0);
 
