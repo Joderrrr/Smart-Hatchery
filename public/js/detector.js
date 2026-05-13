@@ -11,10 +11,12 @@
  *     - coordinates are in 320x320 input pixel space
  */
 
+import { getAuthContext, hasPermission } from './authz.js';
+
 // ── Configuration ──────────────────────────────────────────────────────────
 const MODEL_URL = '/web_model/model.json';
 const MODEL_INPUT_SIZE = 320;
-const CONF_THRESHOLD = 0.9;
+const CONF_THRESHOLD = 0.4;
 const IOU_THRESHOLD = 0.45;
 const MAX_DETECTIONS = 1000;
 const CLASS_NAMES = ['Egg'];
@@ -625,6 +627,12 @@ async function startDetection() {
   const continueBtn = document.getElementById('btn-continue-detection');
 
   try {
+    const context = await getAuthContext();
+    if (!hasPermission(context, 'toggle_detection')) {
+      alert('You do not have permission to start detection.');
+      return;
+    }
+
     if (startBtn) startBtn.disabled = true;
 
     // Request camera permission (triggers browser prompt)
@@ -696,7 +704,18 @@ async function startDetection() {
 /**
  * Stop Detection: stop camera, stop loop, preserve results on canvas.
  */
-function stopDetection() {
+async function stopDetection() {
+  try {
+    const context = await getAuthContext();
+    if (!hasPermission(context, 'toggle_detection')) {
+      alert('You do not have permission to stop detection.');
+      return;
+    }
+  } catch {
+    alert('Unable to verify permissions.');
+    return;
+  }
+
   isDetecting = false;
 
   if (animationFrameId) {
@@ -731,6 +750,12 @@ async function continueDetection() {
   const continueBtn = document.getElementById('btn-continue-detection');
 
   try {
+    const context = await getAuthContext();
+    if (!hasPermission(context, 'toggle_detection')) {
+      alert('You do not have permission to continue detection.');
+      return;
+    }
+
     if (continueBtn) continueBtn.disabled = true;
 
     // Re-start camera with same device
@@ -758,6 +783,32 @@ async function continueDetection() {
     if (continueBtn) continueBtn.disabled = false;
     alert('Failed to resume detection: ' + err.message);
   }
+}
+
+async function applyDetectionPermissionState() {
+  const startBtn = document.getElementById('btn-start-detection');
+  const stopBtn = document.getElementById('btn-stop-detection');
+  const continueBtn = document.getElementById('btn-continue-detection');
+
+  try {
+    const context = await getAuthContext();
+    const allowed = hasPermission(context, 'toggle_detection');
+    if (!allowed) {
+      if (startBtn) startBtn.disabled = true;
+      if (stopBtn) stopBtn.disabled = true;
+      if (continueBtn) continueBtn.disabled = true;
+    }
+  } catch {
+    if (startBtn) startBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = true;
+    if (continueBtn) continueBtn.disabled = true;
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', applyDetectionPermissionState);
+} else {
+  applyDetectionPermissionState();
 }
 
 // ── Exports ────────────────────────────────────────────────────────────────

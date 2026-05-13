@@ -4,24 +4,7 @@
  */
 
 import { checkSensorThresholds } from './notifications.js';
-
-// Status thresholds
-const THRESHOLDS = {
-  temperature: {
-    optimalMin: 20,
-    optimalMax: 32,
-    unit: '°C',
-  },
-  turbidity: {
-    optimalMax: 100,
-    unit: 'NTU',
-  },
-  tds: {
-    optimalMin: 0,
-    optimalMax: 1000,
-    unit: 'ppm',
-  },
-};
+import { getThreshold, getAllThresholds } from './thresholds-config.js';
 
 /**
  * Update sensor card display
@@ -37,7 +20,7 @@ export function updateSensorCard(sensorType, value) {
     return;
   }
 
-  const threshold = THRESHOLDS[sensorType];
+  const threshold = getThreshold(sensorType);
   const valueElement = document.getElementById(`${sensorType}-value`);
   const statusElement = document.getElementById(`${sensorType}-status`);
   const fillElement = document.getElementById(`${sensorType}-fill`);
@@ -126,5 +109,22 @@ export function updateSensorCard(sensorType, value) {
     });
     timestampElement.textContent = `Updated: ${timeStr}`;
   }
+}
+
+export function applyThresholdLabelsToUI() {
+  const thresholds = getAllThresholds();
+  const tempMin = document.getElementById('temperature-min-label');
+  const tempMax = document.getElementById('temperature-max-label');
+  const turbidityMin = document.getElementById('turbidity-min-label');
+  const turbidityMax = document.getElementById('turbidity-max-label');
+  const tdsMin = document.getElementById('tds-min-label');
+  const tdsMax = document.getElementById('tds-max-label');
+
+  if (tempMin) tempMin.textContent = `${thresholds.temperature.optimalMin}°C`;
+  if (tempMax) tempMax.textContent = `${thresholds.temperature.optimalMax}°C`;
+  if (turbidityMin) turbidityMin.textContent = '0 NTU';
+  if (turbidityMax) turbidityMax.textContent = `${thresholds.turbidity.optimalMax} NTU`;
+  if (tdsMin) tdsMin.textContent = `${thresholds.tds.optimalMin} ppm`;
+  if (tdsMax) tdsMax.textContent = `${thresholds.tds.optimalMax} ppm`;
 }
 

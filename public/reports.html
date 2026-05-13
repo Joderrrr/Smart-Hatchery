@@ -36,6 +36,7 @@
           </button>
           <div class="settings-dropdown" id="settings-dropdown" role="menu">
             <a class="settings-item" href="/dashboard" role="menuitem">Dashboard</a>
+            <a class="settings-item" href="/settings" role="menuitem">Settings</a>
             <button class="settings-item" id="settings-logout" type="button" role="menuitem">Log out</button>
           </div>
         </div>
@@ -43,46 +44,52 @@
     </header>
 
     <div class="main-content">
-      <section class="reports-section">
-        <div class="reports-header">
-          <div class="reports-title">Summary</div>
-          <div class="report-actions">
-            <button type="button" id="view-report-btn" class="report-btn view-btn">View Report</button>
-            <button type="button" id="print-report-btn" class="report-btn print-btn">Print Report</button>
+      <section class="reports-section summary-sticky">
+        <div class="summary-horizontal-row">
+          <div class="summary-left">
+            <div class="reports-title">Summary</div>
+            <div class="summary-mini-card">
+              <span class="summary-mini-label">Total Eggs:</span>
+              <span class="summary-mini-value" id="summary-total">0.0</span>
+            </div>
+            <div class="summary-mini-card">
+              <span class="summary-mini-label">Avg/Det:</span>
+              <span class="summary-mini-value" id="summary-average">0.0</span>
+            </div>
           </div>
-          <div class="date-range">
-            <label>
-              <span class="summary-label">Start</span>
-              <input type="date" id="range-start">
-            </label>
-            <label>
-              <span class="summary-label">End</span>
-              <input type="date" id="range-end" placeholder="dd/mm/yyyy" inputmode="numeric">
-            </label>
-            <button type="button" id="apply-range">Apply</button>
-          </div>
-        </div>
-        <div class="summary-grid">
-          <div class="summary-card">
-            <div class="summary-label">Total egg detections</div>
-            <div class="summary-value" id="summary-total">--</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">Average eggs per detection</div>
-            <div class="summary-value" id="summary-average">--</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">Active tanks</div>
-            <div class="summary-value" id="summary-tanks">--</div>
+          
+          <div class="summary-right">
+            <div class="date-range-compact">
+              <input type="date" id="range-start" class="compact-input">
+              <span class="range-sep">to</span>
+              <input type="date" id="range-end" class="compact-input">
+              <button type="button" id="apply-range" class="compact-apply">Apply</button>
+            </div>
+            <div class="report-actions-compact">
+              <button type="button" id="view-report-btn" class="icon-btn" title="View Report">View</button>
+              <button type="button" id="print-report-btn" class="icon-btn" title="Print Report">Print</button>
+            </div>
           </div>
         </div>
-        <div class="report-note" id="summary-note"></div>
       </section>
 
-      <section class="reports-section">
-        <div class="reports-title">Egg Detection Records</div>
+      <section class="reports-section full-width-section">
+        <header class="section-card-header">
+          <div class="section-title-group">
+            <h2 class="reports-title">Egg Detection Records</h2>
+          </div>
+          <div class="aggregation-toggles" data-target="egg">
+            <button class="agg-btn active" data-agg="raw">Raw</button>
+            <button class="agg-btn" data-agg="daily">Daily</button>
+            <button class="agg-btn" data-agg="weekly">Weekly</button>
+            <button class="agg-btn" data-agg="monthly">Monthly</button>
+          </div>
+        </header>
         <div class="report-grid">
-          <div>
+          <div class="chart-container report-chart">
+            <canvas id="egg-chart"></canvas>
+          </div>
+          <div class="table-container">
             <div class="table-wrap">
               <table class="data-table" id="egg-table">
                 <thead>
@@ -98,17 +105,32 @@
             </div>
             <div id="egg-pagination" class="pagination-controls"></div>
           </div>
-          <div class="chart-container report-chart">
-            <canvas id="egg-chart"></canvas>
-          </div>
         </div>
         <div class="report-note" id="egg-note"></div>
       </section>
 
-      <section class="reports-section">
-        <div class="reports-title">Water Quality Records</div>
+      <section class="reports-section full-width-section">
+        <header class="section-card-header">
+          <div class="section-title-group">
+            <h2 class="reports-title">Water Quality Records</h2>
+            <div class="sensor-toggles">
+              <button class="sensor-toggle-btn active" data-sensor="temp" data-index="0">Temp</button>
+              <button class="sensor-toggle-btn active" data-sensor="tds" data-index="1">TDS</button>
+              <button class="sensor-toggle-btn active" data-sensor="turb" data-index="2">Turb</button>
+            </div>
+          </div>
+          <div class="aggregation-toggles" data-target="water">
+            <button class="agg-btn active" data-agg="raw">Raw</button>
+            <button class="agg-btn" data-agg="daily">Daily</button>
+            <button class="agg-btn" data-agg="weekly">Weekly</button>
+            <button class="agg-btn" data-agg="monthly">Monthly</button>
+          </div>
+        </header>
         <div class="report-grid">
-          <div>
+          <div class="chart-container report-chart">
+            <canvas id="water-chart"></canvas>
+          </div>
+          <div class="table-container">
             <div class="table-wrap">
               <table class="data-table" id="water-table">
                 <thead>
@@ -123,9 +145,6 @@
               </table>
             </div>
             <div id="water-pagination" class="pagination-controls"></div>
-          </div>
-          <div class="chart-container report-chart">
-            <canvas id="water-chart"></canvas>
           </div>
         </div>
         <div class="report-note" id="water-note"></div>
@@ -151,6 +170,7 @@
     </div>
   </div>
 
+  <script type="module" src="js/firebase.js"></script>
   <!-- Authentication Guard -->
   <script src="js/auth-guard.js"></script>
 
@@ -162,6 +182,6 @@
 
   <script type="module" src="js/reports.js"></script>
   <script src="js/theme.js" defer></script>
-  <script src="js/settings-dropdown.js"></script>
+  <script type="module" src="js/settings-dropdown.js"></script>
 </body>
 </html>

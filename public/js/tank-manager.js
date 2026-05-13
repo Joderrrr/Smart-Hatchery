@@ -2,6 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
 import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { addEggDetectionNotification } from './notifications.js';
+import { fetchWithAuth, getAuthContext, hasPermission } from './authz.js';
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -193,12 +194,14 @@ async function computeAndStoreAverage(tankId) {
 
   // Persist summary to backend for reports
   try {
+    const context = await getAuthContext();
+    if (!hasPermission(context, 'toggle_detection')) return;
+
     const intervalEnd = new Date();
     const intervalStart = new Date(intervalEnd.getTime() - (5 * 60 * 1000));
 
-    await fetch(REPORTS_EGG_SUMMARY_URL, {
+    await fetchWithAuth(REPORTS_EGG_SUMMARY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         intervalStart: intervalStart.toISOString(),
         intervalEnd: intervalEnd.toISOString(),

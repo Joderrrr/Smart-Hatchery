@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Hatchery Settings</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <div class="header-left">
+        <img class="header-logo" src="/public/css/img/logo.png" alt="Tilapia Hatchery Logo">
+        <div class="header-titles">
+          <h1 class="system-title">Settings</h1>
+          <p class="system-subtitle">System Configuration & User Management</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="theme-toggle-btn" id="theme-toggle" type="button" aria-label="Toggle theme">
+          <span class="theme-toggle-label" id="theme-toggle-label">Theme</span>
+        </button>
+        <div class="settings-container">
+          <button class="settings-btn" id="settings-btn" aria-haspopup="true" aria-expanded="false">
+            <img src="css/icons/settings.png" alt="Settings" class="settings-icon">
+          </button>
+          <div class="settings-dropdown" id="settings-dropdown" role="menu">
+            <a class="settings-item" href="/" role="menuitem">Dashboard</a>
+            <a class="settings-item" href="/reports" role="menuitem">Reports</a>
+            <button class="settings-item" id="settings-logout" type="button" role="menuitem">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <!-- Tab Navigation -->
+      <div class="tab-header">
+        <button class="tab-btn active" data-tab="user-management" type="button">User Management</button>
+        <button class="tab-btn" data-tab="role-permissions" type="button">Role Permissions</button>
+        <button class="tab-btn" data-tab="edit-thresholds" type="button">Edit Thresholds</button>
+      </div>
+
+      <!-- User Management Tab -->
+      <section class="tab-content active" id="user-management" data-tab="user-management">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>User Management & Permissions</h2>
+            <button class="report-btn view-btn" id="add-user-btn" type="button">+ Add User</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="text-align: left;">User / Email</th>
+                  <th style="text-align: left;">Role</th>
+                  <th style="text-align: center;">Status</th>
+                  <th style="text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <tr>
+                  <td colspan="4" style="text-align: center; padding: 2rem;">Loading users...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="toast" id="users-toast"></div>
+        </div>
+      </section>
+
+      <!-- Role Permissions Tab -->
+      <section class="tab-content" id="role-permissions" data-tab="role-permissions">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Role & Permissions Management</h2>
+            <button class="report-btn view-btn" id="add-role-btn" type="button">+ Add Role</button>
+          </div>
+          <div class="roles-container">
+            <div id="roles-list" style="display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); padding: 1.5rem 0;">
+              <div style="text-align: center; padding: 2rem; grid-column: 1 / -1;">Loading roles...</div>
+            </div>
+          </div>
+          <div class="toast" id="roles-toast"></div>
+        </div>
+      </section>
+
+      <!-- Edit Thresholds Tab -->
+      <section class="tab-content" id="edit-thresholds" data-tab="edit-thresholds">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Threshold Configuration</h2>
+          </div>
+          <form id="thresholds-form" style="max-width: 720px; padding: 1rem 0;">
+            <div class="form-group">
+              <label for="temperature-min">Temperature Min (°C)</label>
+              <input type="number" step="0.1" id="temperature-min" required>
+            </div>
+            <div class="form-group">
+              <label for="temperature-max">Temperature Max (°C)</label>
+              <input type="number" step="0.1" id="temperature-max" required>
+            </div>
+            <div class="form-group">
+              <label for="turbidity-max">Turbidity Max (NTU)</label>
+              <input type="number" step="0.1" id="turbidity-max" required>
+            </div>
+            <div class="form-group">
+              <label for="tds-min">TDS Min (ppm)</label>
+              <input type="number" step="0.1" id="tds-min" required>
+            </div>
+            <div class="form-group">
+              <label for="tds-max">TDS Max (ppm)</label>
+              <input type="number" step="0.1" id="tds-max" required>
+            </div>
+            <div class="modal-actions" style="justify-content: flex-start; margin-top: 1.25rem;">
+              <button type="submit" class="report-btn view-btn">Save Thresholds</button>
+            </div>
+          </form>
+          <div class="toast" id="thresholds-toast"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit User -->
+  <div class="modal-overlay" id="user-modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="user-modal-title">Add User</h3>
+        <button class="modal-close" id="user-modal-close" type="button">&times;</button>
+      </div>
+      <form id="user-form" class="modal-form">
+        <div class="form-group">
+          <label for="user-email">Email</label>
+          <input type="email" id="user-email" name="email" required placeholder="user@hatchery.local">
+        </div>
+        <div class="form-group">
+          <label for="user-name">Name</label>
+          <input type="text" id="user-name" name="name" required placeholder="Full Name">
+        </div>
+        <div class="form-group">
+          <label for="user-password">Password</label>
+          <input type="password" id="user-password" name="password" required placeholder="Temporary password">
+          <small id="password-help" style="display: none;">Only required for new users.</small>
+        </div>
+        <div class="form-group">
+          <label for="user-role">Role</label>
+          <select id="user-role" name="role" required>
+            <option value="">-- Select Role --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="user-status">Status</label>
+          <select id="user-status" name="status" required>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="report-btn" id="user-modal-cancel">Cancel</button>
+          <button type="submit" class="report-btn view-btn">Save</button>
+        </div>
+      </form>
+      <div class="modal-error" id="user-modal-error"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Role -->
+  <div class="modal-overlay" id="role-modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="role-modal-title">Add Role</h3>
+        <button class="modal-close" id="role-modal-close" type="button">&times;</button>
+      </div>
+      <form id="role-form" class="modal-form">
+        <div class="form-group">
+          <label for="role-name">Role Name</label>
+          <input type="text" id="role-name" name="roleName" required placeholder="e.g., Supervisor">
+        </div>
+        <div class="form-group">
+          <label>Permissions</label>
+          <div class="permissions-checklist">
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="view_sensors"> View Sensors
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="toggle_detection"> Toggle Detection
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="edit_thresholds"> Edit Thresholds
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="manage_settings"> Manage Settings
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="manage_users"> Manage Users
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="manage_roles"> Manage Roles
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="view_reports"> View Reports
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="permissions" value="send_alerts"> Send Alerts
+            </label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="report-btn" id="role-modal-cancel">Cancel</button>
+          <button type="submit" class="report-btn view-btn">Save</button>
+        </div>
+      </form>
+      <div class="modal-error" id="role-modal-error"></div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="js/firebase.js"></script>
+  <script src="js/auth-guard.js"></script>
+  <script src="js/theme.js" defer></script>
+  <script type="module" src="js/settings-dropdown.js"></script>
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>

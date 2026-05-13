@@ -3,6 +3,9 @@
  * Handles notification display and management
  */
 
+import { fetchWithAuth, getAuthContext, hasPermission } from './authz.js';
+import { getThreshold } from './thresholds-config.js';
+
 let notifications = [];
 let notificationIdCounter = 0;
 
@@ -197,9 +200,11 @@ async function logSystemEvent(type, message) {
   };
 
   try {
-    const response = await fetch('/api/reports/system-events', {
+    const context = await getAuthContext();
+    if (!hasPermission(context, 'send_alerts')) return;
+
+    const response = await fetchWithAuth('/api/reports/system-events', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         eventType: eventTypeMap[type] || 'Notification',
         message,
@@ -221,28 +226,14 @@ async function logSystemEvent(type, message) {
  * @param {number} value - Current sensor value
  */
 export function checkSensorThresholds(sensorType, value) {
-  const THRESHOLDS = {
-    temperature: {
-      optimalMin: 20,
-      optimalMax: 32,
-      warningMargin: 1, // 1°C margin for warning
-      unit: '°C',
-    },
-    turbidity: {
-      optimalMax: 100,
-      warningMargin: 5, // 5 NTU margin for warning
-      unit: 'NTU',
-    },
-    tds: {
-      optimalMin: 0,
-      optimalMax: 1000,
-      warningMargin: 100, // 100 ppm margin for warning
-      unit: 'ppm',
-    },
-  };
-
-  const threshold = THRESHOLDS[sensorType];
+  const threshold = getThreshold(sensorType);
   if (!threshold) return;
+
+  const warningMargin = sensorType === 'temperature'
+    ? 1
+    : sensorType === 'turbidity'
+      ? 5
+      : 100;
 
   if (sensorType === 'temperature') {
     // Critical: Outside optimal range
@@ -262,14 +253,14 @@ export function checkSensorThresholds(sensorType, value) {
       );
     }
     // Warning: Approaching limits
-    else if (value <= threshold.optimalMin + threshold.warningMargin) {
+    else if (value <= threshold.optimalMin + warningMargin) {
       addNotification(
         'warning',
         sensorType,
         value,
         `Temperature is approaching lower limit at ${value.toFixed(2)}${threshold.unit}. Optimal range: ${threshold.optimalMin}-${threshold.optimalMax}${threshold.unit}`
       );
-    } else if (value >= threshold.optimalMax - threshold.warningMargin) {
+    } else if (value >= threshold.optimalMax - warningMargin) {
       addNotification(
         'warning',
         sensorType,
@@ -288,7 +279,7 @@ export function checkSensorThresholds(sensorType, value) {
       );
     }
     // Warning: Approaching limit
-    else if (value >= threshold.optimalMax - threshold.warningMargin) {
+    else if (value >= threshold.optimalMax - warningMargin) {
       addNotification(
         'warning',
         sensorType,
@@ -314,14 +305,14 @@ export function checkSensorThresholds(sensorType, value) {
       );
     }
     // Warning: Approaching limits
-    else if (value <= threshold.optimalMin + threshold.warningMargin) {
+    else if (value <= threshold.optimalMin + warningMargin) {
       addNotification(
         'warning',
         sensorType,
         value,
         `TDS is approaching lower limit at ${value.toFixed(2)}${threshold.unit}. Optimal range: ${threshold.optimalMin}-${threshold.optimalMax}${threshold.unit}`
       );
-    } else if (value >= threshold.optimalMax - threshold.warningMargin) {
+    } else if (value >= threshold.optimalMax - warningMargin) {
       addNotification(
         'warning',
         sensorType,

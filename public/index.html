@@ -54,6 +54,7 @@
           </button>
           <div class="settings-dropdown" id="settings-dropdown" role="menu">
             <a class="settings-item" href="/reports" role="menuitem">Reports</a>
+            <a class="settings-item" href="/settings" role="menuitem">Settings</a>
             <button class="settings-item" id="settings-logout" type="button" role="menuitem">Log out</button>
           </div>
         </div>
@@ -84,9 +85,9 @@
               <div class="range-bar">
                 <div class="range-fill temperature-fill" id="temperature-fill"></div>
                 <div class="range-labels">
-                  <span>20°C</span>
+                  <span id="temperature-min-label">20°C</span>
                   <span class="optimal-range-label">Optimal Range</span>
-                  <span>32°C</span>
+                  <span id="temperature-max-label">32°C</span>
                 </div>
               </div>
             </div>
@@ -105,9 +106,9 @@
               <div class="range-bar">
                 <div class="range-fill turbidity-fill" id="turbidity-fill"></div>
                 <div class="range-labels">
-                  <span>0 NTU</span>
+                  <span id="turbidity-min-label">0 NTU</span>
                   <span class="optimal-range-label">Optimal Range</span>
-                  <span>100 NTU</span>
+                  <span id="turbidity-max-label">100 NTU</span>
                 </div>
               </div>
             </div>
@@ -126,9 +127,9 @@
               <div class="range-bar">
                 <div class="range-fill tds-fill" id="tds-fill"></div>
                 <div class="range-labels">
-                  <span>0 ppm</span>
+                  <span id="tds-min-label">0 ppm</span>
                   <span class="optimal-range-label">Optimal Range</span>
-                  <span>1000 ppm</span>
+                  <span id="tds-max-label">1000 ppm</span>
                 </div>
               </div>
             </div>
@@ -212,64 +213,6 @@
         </section>
       </div>
 
-      <!-- History Charts Row - Aligned below sensors and camera -->
-      <section class="panel charts-panel">
-        <div class="panel-header">
-          <h2>Historical Charts</h2>
-        </div>
-        <div class="charts-section">
-          <div class="charts-grid">
-          <div class="history-card">
-            <div class="card-header">
-              <h3>Temperature History</h3>
-            </div>
-            <div class="time-range-buttons">
-              <button class="time-btn" data-range="1h">1h</button>
-              <button class="time-btn" data-range="6h">6h</button>
-              <button class="time-btn active" data-range="24h">24h</button>
-              <button class="time-btn" data-range="7d">7d</button>
-            </div>
-            <div class="chart-container">
-              <canvas id="temperature-chart"></canvas>
-              <div class="collecting-data" id="temperature-collecting">Collecting data...</div>
-            </div>
-          </div>
-
-          <div class="history-card">
-            <div class="card-header">
-              <h3>Turbidity History</h3>
-            </div>
-            <div class="time-range-buttons">
-              <button class="time-btn" data-range="1h">1h</button>
-              <button class="time-btn" data-range="6h">6h</button>
-              <button class="time-btn active" data-range="24h">24h</button>
-              <button class="time-btn" data-range="7d">7d</button>
-            </div>
-            <div class="chart-container">
-              <canvas id="turbidity-chart"></canvas>
-              <div class="collecting-data" id="turbidity-collecting">Collecting data...</div>
-            </div>
-          </div>
-
-          <div class="history-card">
-            <div class="card-header">
-              <h3>TDS History</h3>
-            </div>
-            <div class="time-range-buttons">
-              <button class="time-btn" data-range="1h">1h</button>
-              <button class="time-btn" data-range="6h">6h</button>
-              <button class="time-btn active" data-range="24h">24h</button>
-              <button class="time-btn" data-range="7d">7d</button>
-            </div>
-            <div class="chart-container">
-              <canvas id="tds-chart"></canvas>
-              <div class="collecting-data" id="tds-collecting">Collecting data...</div>
-            </div>
-          </div>
-          </div>
-        </div>
-      </section>
-
     </div>
   </div>
 
@@ -291,7 +234,7 @@
   <script type="module" src="js/tank-manager.js"></script>
   <script src="js/theme.js" defer></script>
   <script type="module" src="js/app.js"></script>
-  <script src="js/settings-dropdown.js"></script>
+  <script type="module" src="js/settings-dropdown.js"></script>
 </body>
 </html>
 

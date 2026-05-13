@@ -1,3 +1,5 @@
+import { fetchWithAuth, getAuthContext, hasPermission } from './authz.js';
+
 const API = {
   summary: '/api/reports/summary',
   eggs: '/api/reports/egg-detections',
@@ -162,7 +164,7 @@ function buildRangeQuery() {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url);
+  const response = await fetchWithAuth(url);
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
@@ -178,6 +180,119 @@ function formatDateTime(value) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+  });
+}
+
+/**
+ * Condensed date format for chart axes
+ */
+function formatChartDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${m}/${d} ${h}:${min}`;
+}
+
+/**
+ * DataProcessor for aggregation
+ */
+const DataProcessor = {
+  aggregate(records, timeKey, valueKeys, type) {
+    if (type === 'raw' || !records.length) return records;
+
+    const groups = {};
+    records.forEach(rec => {
+      const date = new Date(rec[timeKey]);
+      let key;
+      
+      if (type === 'daily') {
+        key = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      } else if (type === 'weekly') {
+        // Get the first day of the week (Sunday)
+        const d = new Date(date);
+        d.setDate(d.getDate() - d.getDay());
+        key = d.toISOString().split('T')[0];
+      } else if (type === 'monthly') {
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      } else if (type === 'yearly') {
+        key = `${date.getFullYear()}`;
+      }
+
+      if (!groups[key]) {
+        groups[key] = { 
+          count: 0,
+          [timeKey]: type === 'monthly' ? `${key}-01` : key,
+          ...Object.fromEntries(valueKeys.map(k => [k, 0]))
+        };
+        // Preserve some metadata if available
+        if (rec.tank) groups[key].tank = rec.tank;
+      }
+      
+      groups[key].count++;
+      valueKeys.forEach(k => {
+        if (rec[k] !== null && rec[k] !== undefined) {
+          groups[key][k] += Number(rec[k]);
+        }
+      });
+    });
+
+    return Object.values(groups).map(g => {
+      const result = { ...g };
+      valueKeys.forEach(k => {
+        result[k] = g.count > 0 ? g[k] / g.count : null;
+      });
+      delete result.count;
+      return result;
+    }).sort((a, b) => new Date(a[timeKey]) - new Date(b[timeKey]));
+  }
+};
+
+let currentEggRecords = [];
+let currentWaterRecords = [];
+let eggAgg = 'raw';
+let waterAgg = 'raw';
+
+function setupAggregators() {
+  document.querySelectorAll('.aggregation-toggles').forEach(toggle => {
+    // Prevent multiple listeners if re-initialized
+    toggle.onclick = (e) => {
+      const btn = e.target.closest('.agg-btn');
+      if (!btn) return;
+
+      const section = toggle.dataset.target;
+      const type = btn.dataset.agg;
+      
+      toggle.querySelectorAll('.agg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (section === 'egg') {
+        eggAgg = type;
+        const data = DataProcessor.aggregate(currentEggRecords, 'interval_end', ['avg_egg_count'], type);
+        renderEggChart(data);
+        // Note: Table stays raw or updates based on aggregate? 
+        // "Ensure the Table below each chart updates to show only the aggregated rows"
+        renderEggTable(data);
+      } else {
+        waterAgg = type;
+        const data = DataProcessor.aggregate(currentWaterRecords, 'recorded_at', ['temperature', 'tds', 'turbidity'], type);
+        renderWaterChart(data);
+        renderWaterTable(data);
+      }
+    };
+  });
+
+  document.querySelectorAll('.sensor-toggle-btn').forEach(btn => {
+    btn.onclick = () => {
+      btn.classList.toggle('active');
+      const index = parseInt(btn.dataset.index);
+      if (waterChart) {
+        waterChart.setDatasetVisibility(index, btn.classList.contains('active'));
+        waterChart.update();
+      }
+    };
   });
 }
 
@@ -304,13 +419,16 @@ function renderEggChart(records) {
   const ctx = document.getElementById('egg-chart');
   if (!ctx) return;
 
-  const labels = [...new Set(records.map(record => formatDateTime(record.interval_end)))];
+  // Use the records passed (already might be aggregated)
+  const chartRecords = records;
+
+  const labels = [...new Set(chartRecords.map(record => record.interval_end))];
   const tankAData = labels.map(label => {
-    const match = records.find(record => record.tank === 'A' && formatDateTime(record.interval_end) === label);
+    const match = chartRecords.find(record => record.tank === 'A' && record.interval_end === label);
     return match ? Number(match.avg_egg_count) : null;
   });
   const tankBData = labels.map(label => {
-    const match = records.find(record => record.tank === 'B' && formatDateTime(record.interval_end) === label);
+    const match = chartRecords.find(record => record.tank === 'B' && record.interval_end === label);
     return match ? Number(match.avg_egg_count) : null;
   });
 
@@ -346,9 +464,24 @@ function renderEggChart(records) {
       maintainAspectRatio: false,
       plugins: {
         legend: { labels: { color: '#e0e0e0' } },
+        tooltip: {
+          callbacks: {
+            title: (items) => formatDateTime(items[0].label)
+          }
+        }
       },
       scales: {
-        x: { ticks: { color: '#909090' }, grid: { color: '#2d3748' } },
+        x: { 
+          ticks: { 
+            color: '#909090',
+            autoSkip: true,
+            maxTicksLimit: 20,
+            callback: function(val, index) {
+              return formatChartDate(this.getLabelForValue(val));
+            }
+          }, 
+          grid: { color: '#2d3748' } 
+        },
         y: { ticks: { color: '#909090' }, grid: { color: '#2d3748' } },
       },
     },
@@ -359,10 +492,13 @@ function renderWaterChart(records) {
   const ctx = document.getElementById('water-chart');
   if (!ctx) return;
 
-  const labels = records.map(record => formatDateTime(record.recorded_at));
-  const temperatureData = records.map(record => record.temperature ?? null);
-  const tdsData = records.map(record => record.tds ?? null);
-  const turbidityData = records.map(record => record.turbidity ?? null);
+  // Use the records passed (already might be aggregated)
+  const chartRecords = records;
+
+  const labels = chartRecords.map(record => record.recorded_at);
+  const temperatureData = chartRecords.map(record => record.temperature ?? null);
+  const tdsData = chartRecords.map(record => record.tds ?? null);
+  const turbidityData = chartRecords.map(record => record.turbidity ?? null);
 
   if (waterChart) {
     waterChart.destroy();
@@ -404,9 +540,24 @@ function renderWaterChart(records) {
       maintainAspectRatio: false,
       plugins: {
         legend: { labels: { color: '#e0e0e0' } },
+        tooltip: {
+          callbacks: {
+            title: (items) => formatDateTime(items[0].label)
+          }
+        }
       },
       scales: {
-        x: { ticks: { color: '#909090' }, grid: { color: '#2d3748' } },
+        x: { 
+          ticks: { 
+            color: '#909090',
+            autoSkip: true,
+            maxTicksLimit: 20,
+            callback: function(val, index) {
+              return formatChartDate(this.getLabelForValue(val));
+            }
+          }, 
+          grid: { color: '#2d3748' } 
+        },
         y: { ticks: { color: '#909090' }, grid: { color: '#2d3748' } },
       },
     },
@@ -421,6 +572,11 @@ async function loadReports() {
   const eventsNote = document.getElementById('events-note');
 
   try {
+    const context = await getAuthContext();
+    if (!hasPermission(context, 'view_reports')) {
+      throw new Error('Missing view_reports permission');
+    }
+
     const [summary, eggs, water, events] = await Promise.all([
       fetchJson(`${API.summary}?${query}`),
       fetchJson(`${API.eggs}?${query}`),
@@ -439,9 +595,18 @@ async function loadReports() {
     };
 
     renderSummary(computedSummary, eggRecords);
+    
+    // Store records for aggregation
+    currentEggRecords = eggRecords;
+    currentWaterRecords = waterRecords;
+
     renderEggTable(eggRecords);
     renderWaterTable(waterRecords);
     renderEventsTable(eventRecords);
+    
+    // Set to 'raw' default and render
+    eggAgg = 'raw';
+    waterAgg = 'raw';
     renderEggChart(eggRecords);
     renderWaterChart(waterRecords);
 
@@ -700,6 +865,7 @@ function initReports() {
   setDefaultDateRange();
   scheduleStartDateRefresh();
   setupRangeHandler();
+  setupAggregators();
   setupReportActions();
   loadReports();
 }

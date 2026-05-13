@@ -1,0 +1,59 @@
+{
+  "rules": {
+    // Users node - only admins can read/write
+    "users": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('roleId').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('roleId').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+      "$uid": {
+        ".validate": "newData.hasChildren(['uid', 'email', 'name', 'status']) && (newData.child('roleId').isString() || newData.child('role').isString())"
+      }
+    },
+    
+    // Roles node - only admins can read/write
+    "roles": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('roleId').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('roleId').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+      "$roleId": {
+        ".validate": "newData.hasChildren(['name', 'permissions']) && newData.child('permissions').val().length > 0"
+      }
+    },
+    
+    // Sensors node - anyone can read, only special service can write
+    "sensors": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('roleId').val() !== null || root.child('users').child(auth.uid).child('role').val() !== null)",
+      "temperature": {
+        ".validate": "newData.isNumber()"
+      },
+      "turbidity": {
+        ".validate": "newData.isNumber()"
+      },
+      "tds": {
+        ".validate": "newData.isNumber()"
+      }
+    },
+    
+    // Egg detection node - anyone can read, service can write
+    "egg_detection": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".validate": "newData.hasChildren(['count', 'timestamp', 'confidence'])"
+    },
+    
+    // Settings node - only admins can read/write
+    "settings": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('roleId').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('roleId').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'admin')"
+    },
+    
+    // Alerts node - anyone authenticated can read, service can write
+    "alerts": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    
+    // Default: deny all
+    ".read": "auth != null",
+    ".write": false
+  }
+}

@@ -122,18 +122,29 @@ function ensureFirebaseAdminInitialized() {
 
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const databaseURL = process.env.FIREBASE_DATABASE_URL;
+
+  if (!databaseURL) {
+    throw new Error('Missing FIREBASE_DATABASE_URL environment variable.');
+  }
 
   if (serviceAccountPath) {
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const serviceAccount = require(serviceAccountPath);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    admin.initializeApp({ 
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL 
+    });
     firebaseInitialized = true;
     return;
   }
 
   if (serviceAccountJson) {
     const serviceAccount = JSON.parse(serviceAccountJson);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    admin.initializeApp({ 
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL 
+    });
     firebaseInitialized = true;
     return;
   }
@@ -152,6 +163,128 @@ function generateTemporaryPassword() {
     out += chars[Math.floor(Math.random() * chars.length)];
   }
   return out;
+}
+
+const PERMISSIONS = {
+  VIEW_SENSORS: 'view_sensors',
+  TOGGLE_DETECTION: 'toggle_detection',
+  EDIT_THRESHOLDS: 'edit_thresholds',
+  MANAGE_SETTINGS: 'manage_settings',
+  MANAGE_USERS: 'manage_users',
+  MANAGE_ROLES: 'manage_roles',
+  VIEW_REPORTS: 'view_reports',
+  SEND_ALERTS: 'send_alerts',
+};
+
+const DEFAULT_ROLE_PERMISSIONS = {
+  admin: [
+    PERMISSIONS.VIEW_SENSORS,
+    PERMISSIONS.TOGGLE_DETECTION,
+    PERMISSIONS.EDIT_THRESHOLDS,
+    PERMISSIONS.MANAGE_SETTINGS,
+    PERMISSIONS.MANAGE_USERS,
+    PERMISSIONS.MANAGE_ROLES,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.SEND_ALERTS,
+  ],
+  technician: [
+    PERMISSIONS.VIEW_SENSORS,
+    PERMISSIONS.TOGGLE_DETECTION,
+    PERMISSIONS.EDIT_THRESHOLDS,
+    PERMISSIONS.SEND_ALERTS,
+  ],
+  viewer: [
+    PERMISSIONS.VIEW_SENSORS,
+    PERMISSIONS.VIEW_REPORTS,
+  ],
+};
+
+function normalizePermissions(permissions) {
+  if (!Array.isArray(permissions)) return [];
+  return permissions.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim());
+}
+
+async function getUserAuthorizationContext(uid) {
+  ensureFirebaseAdminInitialized();
+  const db = admin.database();
+
+  const userSnapshot = await db.ref(`/users/${uid}`).once('value');
+  const user = userSnapshot.val();
+  if (!user) return null;
+
+  const roleId = String(user.roleId || user.role || '').trim();
+  let roleRecord = null;
+  if (roleId) {
+    const roleSnapshot = await db.ref(`/roles/${roleId}`).once('value');
+    roleRecord = roleSnapshot.val();
+  }
+
+  const fallbackPermissions = DEFAULT_ROLE_PERMISSIONS[roleId] || [];
+  const permissions = normalizePermissions(roleRecord?.permissions);
+  const resolvedPermissions = permissions.length ? permissions : fallbackPermissions;
+
+  return {
+    user,
+    roleId,
+    roleName: roleRecord?.name || roleId || null,
+    permissions: resolvedPermissions,
+  };
+}
+
+async function authenticateRequest(req, res, next) {
+  try {
+    ensureFirebaseAdminInitialized();
+    const authHeader = String(req.headers.authorization || '');
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ ok: false, message: 'Missing or invalid Authorization header.' });
+    }
+
+    const idToken = authHeader.slice(7).trim();
+    if (!idToken) {
+      return res.status(401).json({ ok: false, message: 'Missing Firebase ID token.' });
+    }
+
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    req.auth = decodedToken;
+    return next();
+  } catch (error) {
+    return res.status(401).json({ ok: false, message: 'Unauthorized request.' });
+  }
+}
+
+function requirePermissions(requiredPermissions, options = {}) {
+  const { any = false } = options;
+
+  return async (req, res, next) => {
+    try {
+      const required = normalizePermissions(requiredPermissions);
+      if (!required.length) return next();
+
+      const uid = req.auth?.uid;
+      if (!uid) {
+        return res.status(401).json({ ok: false, message: 'Unauthorized request.' });
+      }
+
+      const authz = await getUserAuthorizationContext(uid);
+      if (!authz) {
+        return res.status(403).json({ ok: false, message: 'Access denied. User profile not found.' });
+      }
+
+      const ownedPermissions = new Set(authz.permissions);
+      const isAllowed = any
+        ? required.some((permission) => ownedPermissions.has(permission))
+        : required.every((permission) => ownedPermissions.has(permission));
+
+      if (!isAllowed) {
+        return res.status(403).json({ ok: false, message: 'Access denied. Missing required permissions.' });
+      }
+
+      req.authz = authz;
+      return next();
+    } catch (error) {
+      return res.status(500).json({ ok: false, message: 'Failed to evaluate permissions.' });
+    }
+  };
 }
 
 const forgotPasswordCooldownMs = 5 * 60 * 1000;
@@ -200,7 +333,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-app.post('/api/reports/egg-detections', async (req, res) => {
+app.post('/api/reports/egg-detections', authenticateRequest, requirePermissions([PERMISSIONS.TOGGLE_DETECTION]), async (req, res) => {
   try {
     const pool = getMysqlPool(res);
     if (!pool) return;
@@ -227,7 +360,7 @@ app.post('/api/reports/egg-detections', async (req, res) => {
   }
 });
 
-app.post('/api/reports/water-readings', async (req, res) => {
+app.post('/api/reports/water-readings', authenticateRequest, requirePermissions([PERMISSIONS.VIEW_SENSORS]), async (req, res) => {
   try {
     const pool = getMysqlPool(res);
     if (!pool) return;
@@ -253,7 +386,7 @@ app.post('/api/reports/water-readings', async (req, res) => {
   }
 });
 
-app.post('/api/reports/system-events', async (req, res) => {
+app.post('/api/reports/system-events', authenticateRequest, requirePermissions([PERMISSIONS.SEND_ALERTS]), async (req, res) => {
   try {
     const pool = getMysqlPool(res);
     if (!pool) return;
@@ -293,7 +426,7 @@ function getDateRange(req) {
   return { start, end };
 }
 
-app.get('/api/reports/summary', async (req, res) => {
+app.get('/api/reports/summary', authenticateRequest, requirePermissions([PERMISSIONS.VIEW_REPORTS]), async (req, res) => {
   try {
     const pool = getMysqlPool(res);
     if (!pool) return;
@@ -322,7 +455,7 @@ app.get('/api/reports/summary', async (req, res) => {
   }
 });
 
-app.get('/api/reports/egg-detections', async (req, res) => {
+app.get('/api/reports/egg-detections', authenticateRequest, requirePermissions([PERMISSIONS.VIEW_REPORTS]), async (req, res) => {
   try {
     const pool = getMysqlPool(res);
     if (!pool) return;
@@ -340,7 +473,7 @@ app.get('/api/reports/egg-detections', async (req, res) => {
   }
 });
 
-app.get('/api/reports/water-readings', async (req, res) => {
+app.get('/api/reports/water-readings', authenticateRequest, requirePermissions([PERMISSIONS.VIEW_REPORTS]), async (req, res) => {
   try {
     const pool = getMysqlPool(res);
     if (!pool) return;
@@ -358,7 +491,7 @@ app.get('/api/reports/water-readings', async (req, res) => {
   }
 });
 
-app.get('/api/reports/system-events', async (req, res) => {
+app.get('/api/reports/system-events', authenticateRequest, requirePermissions([PERMISSIONS.VIEW_REPORTS]), async (req, res) => {
   try {
     const pool = getMysqlPool(res);
     if (!pool) return;
@@ -383,7 +516,7 @@ app.use('/web_model', express.static(path.join(__dirname, 'web_model')));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // SMS relay endpoint - securely proxies TextBee API calls from the browser
-app.post('/api/alerts/sms', async (req, res) => {
+app.post('/api/alerts/sms', authenticateRequest, requirePermissions([PERMISSIONS.SEND_ALERTS]), async (req, res) => {
   try {
     const message = String(req.body?.message || '').trim();
     if (!message) {
@@ -416,6 +549,213 @@ app.post('/api/alerts/sms', async (req, res) => {
   }
 });
 
+// ============ RBAC & USER MANAGEMENT ENDPOINTS ============
+
+/**
+ * Create a new user via Firebase Admin SDK
+ * This performs the "Double Write": creates Firebase Auth user + writes to RTDB
+ * Only callable by authenticated admins (client should enforce this)
+ */
+app.post('/api/users', authenticateRequest, requirePermissions([PERMISSIONS.MANAGE_USERS]), async (req, res) => {
+  try {
+    console.log('Received user creation request. Body:', JSON.stringify(req.body));
+
+    const { email, password, name, roleId, status } = req.body;
+
+    // Validate inputs
+    if (!email || !email.trim()) {
+      console.warn('Missing or empty email');
+      return res.status(400).json({ ok: false, message: 'Email is required' });
+    }
+    if (!password || !password.trim()) {
+      console.warn('Missing or empty password');
+      return res.status(400).json({ ok: false, message: 'Password is required' });
+    }
+    if (!name || !name.trim()) {
+      console.warn('Missing or empty name');
+      return res.status(400).json({ ok: false, message: 'Name is required' });
+    }
+    if (!roleId || !String(roleId).trim()) {
+      console.warn('Missing or empty roleId');
+      return res.status(400).json({ ok: false, message: 'Role is required' });
+    }
+    if (!status || !status.trim()) {
+      console.warn('Missing or empty status');
+      return res.status(400).json({ ok: false, message: 'Status is required' });
+    }
+
+    // Ensure Firebase Admin is initialized
+    ensureFirebaseAdminInitialized();
+
+    const db = admin.database();
+    const selectedRoleId = String(roleId).trim();
+    const roleRef = db.ref(`/roles/${selectedRoleId}`);
+    const roleSnapshot = await roleRef.once('value');
+    const roleRecord = roleSnapshot.val();
+    if (!roleRecord) {
+      return res.status(400).json({ ok: false, message: 'Selected role does not exist' });
+    }
+
+    // Create user in Firebase Auth
+    console.log(`Creating Firebase Auth user for: ${email}`);
+    const userRecord = await admin.auth().createUser({
+      email: email.trim(),
+      password: password.trim(),
+      displayName: name.trim(),
+    });
+
+    console.log(`✓ Created Firebase Auth user: ${userRecord.uid}`);
+
+    // Write user data to Realtime Database
+    const userRef = db.ref(`/users/${userRecord.uid}`);
+    await userRef.set({
+      uid: userRecord.uid,
+      email: email.trim(),
+      name: name.trim(),
+      role: roleRecord.name || selectedRoleId,
+      roleId: selectedRoleId,
+      status: status.trim(),
+      createdAt: new Date().toISOString(),
+    });
+
+    console.log(`✓ Wrote user data to RTDB: ${userRecord.uid}`);
+
+    return res.status(201).json({
+      ok: true,
+      message: 'User created successfully',
+      uid: userRecord.uid,
+    });
+  } catch (error) {
+    console.error('Error creating user:', error.message);
+    console.error('Error code:', error.code);
+
+    // Handle common Firebase Auth errors
+    let errorMessage = 'Failed to create user';
+    if (error.code === 'auth/email-already-exists') {
+      errorMessage = 'Email already registered';
+    } else if (error.code === 'auth/invalid-email') {
+      errorMessage = 'Invalid email address format';
+    } else if (error.code === 'auth/weak-password') {
+      errorMessage = 'Password is too weak (minimum 6 characters)';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    return res.status(400).json({ ok: false, message: errorMessage });
+  }
+});
+
+/**
+ * Get all users from Realtime Database
+ */
+app.get('/api/users', authenticateRequest, requirePermissions([PERMISSIONS.MANAGE_USERS]), async (req, res) => {
+  try {
+    ensureFirebaseAdminInitialized();
+
+    const db = admin.database();
+    const usersRef = db.ref('/users');
+    const snapshot = await usersRef.once('value');
+    const users = snapshot.val() || {};
+
+    return res.json({ ok: true, users });
+  } catch (error) {
+    console.error('Error fetching users:', error.message);
+    return res.status(500).json({ ok: false, message: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * Get all roles from Realtime Database
+ */
+app.get('/api/roles', authenticateRequest, requirePermissions([PERMISSIONS.MANAGE_ROLES, PERMISSIONS.MANAGE_USERS], { any: true }), async (req, res) => {
+  try {
+    ensureFirebaseAdminInitialized();
+
+    const db = admin.database();
+    const rolesRef = db.ref('/roles');
+    const snapshot = await rolesRef.once('value');
+    const roles = snapshot.val() || {};
+
+    return res.json({ ok: true, roles });
+  } catch (error) {
+    console.error('Error fetching roles:', error.message);
+    return res.status(500).json({ ok: false, message: 'Failed to fetch roles' });
+  }
+});
+
+app.get('/api/settings/thresholds', authenticateRequest, requirePermissions([PERMISSIONS.EDIT_THRESHOLDS, PERMISSIONS.MANAGE_SETTINGS, PERMISSIONS.VIEW_SENSORS], { any: true }), async (req, res) => {
+  try {
+    ensureFirebaseAdminInitialized();
+    const db = admin.database();
+    const snapshot = await db.ref('/settings/thresholds').once('value');
+    const thresholds = snapshot.val() || {
+      temperature: { min: 20, max: 32 },
+      turbidity: { max: 100 },
+      tds: { min: 0, max: 1000 },
+    };
+
+    return res.json({ ok: true, thresholds });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: 'Failed to fetch thresholds' });
+  }
+});
+
+app.put('/api/settings/thresholds', authenticateRequest, requirePermissions([PERMISSIONS.EDIT_THRESHOLDS, PERMISSIONS.MANAGE_SETTINGS]), async (req, res) => {
+  try {
+    const temperatureMin = Number(req.body?.temperature?.min);
+    const temperatureMax = Number(req.body?.temperature?.max);
+    const turbidityMax = Number(req.body?.turbidity?.max);
+    const tdsMin = Number(req.body?.tds?.min);
+    const tdsMax = Number(req.body?.tds?.max);
+
+    if (
+      [temperatureMin, temperatureMax, turbidityMax, tdsMin, tdsMax].some((value) => Number.isNaN(value))
+      || temperatureMin >= temperatureMax
+      || tdsMin >= tdsMax
+      || turbidityMax < 0
+    ) {
+      return res.status(400).json({ ok: false, message: 'Invalid thresholds payload' });
+    }
+
+    ensureFirebaseAdminInitialized();
+    const db = admin.database();
+    const payload = {
+      temperature: { min: temperatureMin, max: temperatureMax },
+      turbidity: { max: turbidityMax },
+      tds: { min: tdsMin, max: tdsMax },
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.auth?.uid || null,
+    };
+    await db.ref('/settings/thresholds').set(payload);
+    return res.json({ ok: true, thresholds: payload });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: 'Failed to update thresholds' });
+  }
+});
+
+// ============ END RBAC ENDPOINTS ============
+
+app.get('/api/auth/context', authenticateRequest, async (req, res) => {
+  try {
+    const authz = await getUserAuthorizationContext(req.auth.uid);
+    if (!authz) {
+      return res.status(404).json({ ok: false, message: 'User profile not found.' });
+    }
+
+    return res.json({
+      ok: true,
+      uid: req.auth.uid,
+      email: req.auth.email || authz.user.email || null,
+      roleId: authz.roleId,
+      roleName: authz.roleName,
+      permissions: authz.permissions,
+      status: authz.user.status || null,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: 'Failed to load auth context.' });
+  }
+});
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -431,6 +771,10 @@ app.get('/dashboard', (req, res) => {
 
 app.get('/reports', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'reports.html'));
+});
+
+app.get('/settings', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'settings.html'));
 });
 
 // Catch-all: serve login page for any unmatched route
@@ -471,12 +815,3 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 module.exports = app;
-
-
-
-
-
-
-
-
-

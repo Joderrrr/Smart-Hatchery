@@ -1,3 +1,5 @@
+import { fetchWithAuth, getAuthContext, hasPermission } from './authz.js';
+
 const AGG_INTERVAL_MS = 5 * 60 * 1000;
 const samples = {
   temperature: [],
@@ -37,9 +39,11 @@ async function flushSamples() {
   samples.tds = [];
 
   try {
-    await fetch('/api/reports/water-readings', {
+    const context = await getAuthContext();
+    if (!hasPermission(context, 'view_sensors')) return;
+
+    await fetchWithAuth('/api/reports/water-readings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
   } catch {

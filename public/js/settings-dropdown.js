@@ -1,9 +1,32 @@
+import { getAuthContext, hasPermission } from './authz.js';
+
+async function applyNavigationPermissions(settingsDropdown) {
+  const items = Array.from(settingsDropdown.querySelectorAll('.settings-item[href]'));
+  const reportsLink = items.find((item) => item.getAttribute('href') === '/reports');
+  const settingsLink = items.find((item) => item.getAttribute('href') === '/settings');
+
+  try {
+    const context = await getAuthContext();
+    const canViewReports = hasPermission(context, 'view_reports');
+    const canOpenSettings = hasPermission(context, 'manage_settings')
+      || hasPermission(context, 'manage_users')
+      || hasPermission(context, 'manage_roles');
+
+    if (reportsLink) reportsLink.style.display = canViewReports ? '' : 'none';
+    if (settingsLink) settingsLink.style.display = canOpenSettings ? '' : 'none';
+  } catch (error) {
+    if (reportsLink) reportsLink.style.display = 'none';
+    if (settingsLink) settingsLink.style.display = 'none';
+  }
+}
+
 function setupSettingsDropdown() {
   const settingsBtn = document.getElementById('settings-btn');
   const settingsDropdown = document.getElementById('settings-dropdown');
   const logoutBtn = document.getElementById('settings-logout');
 
   if (!settingsBtn || !settingsDropdown) return;
+  applyNavigationPermissions(settingsDropdown);
 
   const closeDropdown = () => {
     settingsDropdown.classList.remove('active');
